@@ -87,10 +87,19 @@
   .predikat-C{ background:var(--c-bg); color:var(--c); border-color:var(--c-line); }
   .predikat-D{ background:var(--d-bg); color:var(--d); border-color:var(--d-line); }
 
-  /* ---- Tab ---- */
-  .tab-btn{ border-bottom:2px solid transparent; color:var(--slate-600); font-weight:600; }
-  .tab-btn:hover{ color:var(--navy-700); }
-  .tab-btn.active{ border-bottom-color:var(--navy-700); color:var(--navy-900); }
+  /* ---- Penanda mata pelajaran ----
+     Setiap mapel punya warna aksennya sendiri supaya laporan GT dan OAW tidak
+     pernah tertukar saat dibaca sekilas atau dicetak. */
+  .kop-mapel{
+    display:flex; align-items:center; gap:12px;
+    border-left:5px solid var(--aksen, var(--navy-700));
+    background:var(--aksen-lembut, var(--navy-50));
+    border-radius:12px; padding:14px 18px; margin-bottom:16px;
+  }
+  .lencana-mapel{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.1em; text-transform:uppercase;
+    background:var(--aksen, var(--navy-700)); color:#fff; padding:4px 9px; border-radius:6px; white-space:nowrap;
+  }
 
   /* ---- Form ---- */
   .kolom-isian{
@@ -133,7 +142,6 @@
     body{ background:#fff; }
     .tanpa-cetak{ display:none !important; }
     .panel,.panel-flat{ border-color:#CBD5E1; box-shadow:none; break-inside:avoid; }
-    .tab-panel{ display:block !important; page-break-inside:avoid; }
     .tabel-nilai th{ position:static; }
   }
 </style>
@@ -162,21 +170,21 @@
     <div class="mb-5">
       <p class="eyebrow mb-1.5">Semester Ganjil · 16 Pertemuan</p>
       <h1 class="font-display text-[26px] sm:text-[32px] font-semibold leading-tight mb-1.5">Rekap nilai siswa</h1>
-      <p id="subjudul" class="text-sm text-[var(--slate-600)] max-w-xl">Pilih kelas, lalu ketik nama lengkap Anda untuk melihat rincian nilai pengetahuan, keterampilan, sikap, dan kehadiran.</p>
+      <p id="subjudul" class="text-sm text-[var(--slate-600)] max-w-xl">Pilih kelas dan mata pelajaran, lalu ketik nama lengkap Anda. Setiap mata pelajaran punya laporan nilainya sendiri.</p>
     </div>
 
     <div class="panel p-4 sm:p-5">
-      <div class="grid sm:grid-cols-[190px_1fr] gap-3">
+      <div class="grid sm:grid-cols-2 gap-3">
         <div>
           <label for="pilihKelas" class="eyebrow block mb-1.5">Kelas</label>
           <select id="pilihKelas" class="kolom-isian">
             <option value="">Pilih kelas</option>
-            <optgroup label="Kelas X — DPK">
+            <optgroup label="Kelas X">
               <option value="X TP 1">X TP 1</option>
               <option value="X TP 2">X TP 2</option>
               <option value="X TP 3">X TP 3</option>
             </optgroup>
-            <optgroup label="Kelas XI — GT &amp; OAW">
+            <optgroup label="Kelas XI">
               <option value="XI TP 1">XI TP 1</option>
               <option value="XI TP 2">XI TP 2</option>
               <option value="XI TP 3">XI TP 3</option>
@@ -184,9 +192,16 @@
           </select>
         </div>
         <div>
-          <label for="isianNama" class="eyebrow block mb-1.5">Nama lengkap</label>
-          <input type="text" id="isianNama" maxlength="80" autocomplete="off" placeholder="Ketik nama seperti tertulis di daftar hadir" class="kolom-isian">
+          <label for="pilihMapel" class="eyebrow block mb-1.5">Mata pelajaran</label>
+          <select id="pilihMapel" class="kolom-isian" disabled>
+            <option value="">Pilih kelas lebih dulu</option>
+          </select>
         </div>
+      </div>
+
+      <div class="mt-3">
+        <label for="isianNama" class="eyebrow block mb-1.5">Nama lengkap</label>
+        <input type="text" id="isianNama" maxlength="80" autocomplete="off" placeholder="Ketik nama seperti tertulis di daftar hadir" class="kolom-isian">
       </div>
 
       <div id="blokNis" class="mt-3 grid sm:grid-cols-[190px_1fr] gap-3">
@@ -237,6 +252,15 @@
       <strong class="font-semibold">Mode contoh.</strong> URL Apps Script belum diisi admin, jadi yang tampil adalah data contoh — coba kelas “X TP 1” dengan nama “Ahmad”.
     </div>
 
+    <!-- Kop mata pelajaran: laporan ini milik satu mapel saja -->
+    <div id="kopMapel" class="kop-mapel">
+      <span id="lencanaMapel" class="lencana-mapel">—</span>
+      <div class="min-w-0">
+        <p id="namaMapel" class="font-display text-[15px] font-semibold leading-tight">—</p>
+        <p id="catatanMapel" class="text-xs text-[var(--slate-600)] leading-tight mt-0.5">Laporan berlaku untuk mata pelajaran ini saja.</p>
+      </div>
+    </div>
+
     <!-- Identitas -->
     <div class="panel p-5 sm:p-6 mb-4 flex flex-wrap items-start justify-between gap-4">
       <div class="min-w-0">
@@ -246,23 +270,17 @@
       </div>
       <div class="flex items-center gap-2 tanpa-cetak">
         <button type="button" onclick="window.print()" class="tombol-sekunder">Cetak</button>
-        <button type="button" id="tombolCariLain" class="tombol-sekunder">Cari nama lain</button>
+        <button type="button" id="tombolCariLain" class="tombol-sekunder">Cari lagi</button>
       </div>
     </div>
 
-    <!-- Tab mata pelajaran -->
-    <div id="navTab" class="flex gap-5 border-b border-[var(--steel-200)] mb-5 text-sm" role="tablist"></div>
+    <!-- Laporan satu mata pelajaran -->
+    <div id="isiLaporan"></div>
 
-    <!-- Panel per mata pelajaran -->
-    <div id="panelTab"></div>
-
-    <!-- Rekap lintas mapel (kelas XI) -->
-    <div id="rekapKejuruan" class="hidden panel p-5 mt-5 flex items-center justify-between gap-4">
-      <div>
-        <p class="eyebrow mb-1">Rata-rata keahlian kejuruan</p>
-        <p class="text-xs text-[var(--slate-600)]">Rerata Nilai Akhir Gambar Teknik dan OAW</p>
-      </div>
-      <span id="angkaRekap" class="font-display text-3xl font-semibold">—</span>
+    <!-- Ajakan membuka mapel pasangannya (khusus kelas XI) -->
+    <div id="ajakanMapelLain" class="hidden panel-flat mt-5 px-5 py-4 flex flex-wrap items-center justify-between gap-3 tanpa-cetak">
+      <p class="text-sm text-[var(--slate-600)]">Nilai <b id="namaMapelLain" class="text-[var(--ink)] font-semibold">—</b> dihitung terpisah dan tidak termasuk dalam laporan ini.</p>
+      <button type="button" id="tombolMapelLain" class="tombol-sekunder">Buka laporannya</button>
     </div>
 
     <!-- Legenda -->
@@ -313,7 +331,7 @@ const JEDA_ULANG_MS = [700, 1500];
    Kunci objek WAJIB sama dengan kunci yang dikirim Code.gs.
    ========================================================================== */
 const RUBRIK = {
-  dpk: {
+  DPK: {
     keterampilan: {
       prosesBisnis: { label:"Proses bisnis pengelasan", teks:[
         "Belum mampu menjelaskan alur proses bisnis bidang pengelasan secara memadai; perlu bimbingan intensif.",
@@ -347,7 +365,7 @@ const RUBRIK = {
         "Gambar tiga dimensi benda kerja akurat, proporsional, dan rapi."]}
     }
   },
-  gt: {
+  GT: {
     proses: {
       kesiapan: { label:"Kesiapan & prosedur kerja", teks:[
         "Tidak menyiapkan alat gambar dengan baik dan tidak mengikuti prosedur kerja yang ditetapkan.",
@@ -388,7 +406,7 @@ const RUBRIK = {
         "Bentangan/bukaan tepat ukuran dan bentuk, siap dipakai sebagai acuan pemotongan material."]}
     }
   },
-  oaw: {
+  OAW: {
     proses: {
       persiapanAlat: { label:"Persiapan alat & material", teks:[
         "Tidak melakukan persiapan alat dan material dengan baik sebelum praktik.",
@@ -473,12 +491,27 @@ const RUBRIK = {
   }
 };
 
-/* Identitas tiap mata pelajaran untuk kebutuhan tampilan. */
+/* Identitas tiap mata pelajaran. `aksen` membuat laporan GT dan OAW punya
+   warna berbeda supaya keduanya tidak pernah tertukar saat dibaca atau
+   dicetak. `konteks` menentukan rubrik sikap mana yang dipakai:
+   "gambar" (ruang gambar) atau "bengkel" (bengkel las). */
 const PROFIL_MAPEL = {
-  dpk: { nama:"Dasar Program Keahlian", singkat:"DPK", konteks:"gambar" },
-  gt:  { nama:"Gambar Teknik",          singkat:"Gambar Teknik", konteks:"gambar" },
-  oaw: { nama:"Oxy-Acetylene Welding",  singkat:"OAW", konteks:"bengkel" }
+  DPK: { nama:"Dasar Program Keahlian Teknik Pengelasan", singkat:"DPK", konteks:"gambar",
+         aksen:"#12446F", aksenLembut:"#EEF4FA",
+         catatan:"Mata pelajaran kelas X. Nilai akhir dihitung dari pengetahuan, keterampilan, dan sikap." },
+  GT:  { nama:"Gambar Teknik", singkat:"GT", konteks:"gambar",
+         aksen:"#1B6AA8", aksenLembut:"#EAF2FA",
+         catatan:"Mata pelajaran tersendiri dengan nilai rapor sendiri, terpisah dari OAW." },
+  OAW: { nama:"Oxy-Acetylene Welding", singkat:"OAW", konteks:"bengkel",
+         aksen:"#A8560C", aksenLembut:"#FBF1E4",
+         catatan:"Mata pelajaran tersendiri dengan nilai rapor sendiri, terpisah dari Gambar Teknik." }
 };
+
+/* Mapel yang tersedia di tiap tingkat kelas. */
+function mapelUntukKelas(kelas){
+  if (!kelas) return [];
+  return /^X\s/i.test(kelas) ? ['DPK'] : ['GT','OAW'];
+}
 
 /* ==========================================================================
    3) DATA CONTOH (dipakai bila URL belum diisi dan bukan di Apps Script)
@@ -486,21 +519,20 @@ const PROFIL_MAPEL = {
 const DATA_CONTOH = {
   ok: true,
   data: [{
-    nis: "4058/430.21", nama: "Ahmad Fauzi (contoh)", kelas: "X TP 1",
-    dpk: {
+    nis: "4058/430.21", nama: "Ahmad Fauzi (contoh)", kelas: "X TP 1", mapel: "DPK",
+    nilai: {
       pengetahuan: 82,
       keterampilan: { prosesBisnis:3, kewirausahaan:3, jenisGaris:4, etiket:3, pandangan:3, benda3d:4 },
       nilaiKeterampilan: 82.5, nilaiSikap: 89.17, nilaiAkhir: 83.02, predikat: "B (Baik)",
       sikap: { kehadiran:4, kelengkapan:3, tataTertib:4, nilaiKedisiplinan:91.67, keaktifan:3, tanggungJawab:4,
                catatan:"Konsisten menjaga kerapian gambar dan membantu teman.", kedisiplinanPakaiKelengkapan:true },
       absensi: { hadir:15, sakit:1, izin:0, alpa:0, totalPertemuan:16, persenHadir:94, persenKelengkapan:88 }
-    },
-    gt: null, oaw: null
+    }
   }],
   meta: {
-    tipe:"DPK", kelas:"X TP 1", totalPertemuan:16,
-    bobot: { dpk: { pengetahuan:30, keterampilan:60, kedisiplinan:4, keaktifan:3, tanggungJawab:3 } },
-    bobotKomponen: { dpk: { keterampilan: { prosesBisnis:15, kewirausahaan:15, jenisGaris:15, etiket:15, pandangan:25, benda3d:15 } } }
+    kelas:"X TP 1", mapel:"DPK", namaMapel:"Dasar Program Keahlian Teknik Pengelasan", totalPertemuan:16,
+    bobot: { pengetahuan:30, keterampilan:60, kedisiplinan:4, keaktifan:3, tanggungJawab:3, sikapTotal:10 },
+    bobotKomponen: { keterampilan: { prosesBisnis:15, kewirausahaan:15, jenisGaris:15, etiket:15, pandangan:25, benda3d:15 } }
   },
   lastUpdated: "data contoh"
 };
@@ -543,29 +575,30 @@ function pipMeter(skor){
 /* ==========================================================================
    5) LAPISAN DATA
    ========================================================================== */
-function panggilGas(kelas, nama, nis){
+function panggilGas(kelas, mapel, nama, nis){
   return new Promise(function(resolve, reject){
     google.script.run
       .withSuccessHandler(resolve)
       .withFailureHandler(reject)
-      .apiCariSiswa(kelas, nama, nis);
+      .apiCariSiswa(kelas, mapel, nama, nis);
   });
 }
 
-function bangunUrl(kelas, nama, nis){
+function bangunUrl(kelas, mapel, nama, nis){
   const p = new URLSearchParams();
   p.set('format','json');
   p.set('cb', Date.now().toString());
   if (kelas) p.set('kelas', kelas);
+  if (mapel) p.set('mapel', mapel);
   if (nama)  p.set('nama', nama);
   if (nis)   p.set('nis', nis);
   return URL_APPS_SCRIPT + '?' + p.toString();
 }
 
-async function ambilData(kelas, nama, nis){
+async function ambilData(kelas, mapel, nama, nis){
   if (adaGas){
     try {
-      const payload = await panggilGas(kelas, nama, nis);
+      const payload = await panggilGas(kelas, mapel, nama, nis);
       return tafsirkanPayload(payload);
     } catch (err){
       return { ok:false, alasan:'jaringan', data:[] };
@@ -580,7 +613,7 @@ async function ambilData(kelas, nama, nis){
     const kendali = new AbortController();
     const jam = setTimeout(function(){ kendali.abort(); }, BATAS_WAKTU_MS);
     try {
-      const res = await fetch(bangunUrl(kelas, nama, nis), { method:'GET', cache:'no-store', signal:kendali.signal });
+      const res = await fetch(bangunUrl(kelas, mapel, nama, nis), { method:'GET', cache:'no-store', signal:kendali.signal });
       clearTimeout(jam);
       if (!res.ok) return { ok:false, alasan:'galat_http', data:[], kode:res.status };
       let payload;
@@ -612,11 +645,13 @@ function tafsirkanPayload(payload){
    ========================================================================== */
 let sedangProses = false;
 let metaAktif = null;
-let tabAktif = null;
+let kelasTerakhir = '';
+let mapelTerakhir = '';
 
 function setMemuat(aktif){
   sedangProses = aktif;
-  ['pilihKelas','isianNama','isianNis'].forEach(function(id){ if ($(id)) $(id).disabled = aktif; });
+  ['pilihKelas','pilihMapel','isianNama','isianNis'].forEach(function(id){ if ($(id)) $(id).disabled = aktif; });
+  if (!aktif) segarkanPilihanMapel(true);
   $('tombolCari').disabled = aktif;
   $('labelTombolCari').textContent = aktif ? 'Mencari…' : 'Lihat nilai saya';
   $('blokMemuat').classList.toggle('hidden', !aktif);
@@ -643,10 +678,18 @@ function tampilkanGalat(judul, detail, bolehUlang){
 async function cariNilai(){
   if (sedangProses) return;
   const kelas = $('pilihKelas').value;
+  const mapel = $('pilihMapel').value;
   const nama = $('isianNama').value.trim().replace(/\s+/g,' ');
   const nis = ($('isianNis') ? $('isianNis').value : '').trim();
+  const pilihan = mapelUntukKelas(kelas);
 
   if (!kelas){ tampilkanGalat('Kelas belum dipilih','Pilih kelas Anda lebih dulu, misalnya X TP 1 atau XI TP 2.'); return; }
+  if (!mapel || pilihan.indexOf(mapel) === -1){
+    tampilkanGalat('Mata pelajaran belum dipilih',
+      'Gambar Teknik dan OAW dinilai terpisah. Pilih salah satu untuk melihat laporannya.');
+    $('pilihMapel').focus();
+    return;
+  }
   if (!nama){ tampilkanGalat('Nama belum diisi','Ketik nama lengkap Anda seperti tertulis di daftar hadir.'); return; }
   if (nama.length < 3){ tampilkanGalat('Nama terlalu pendek','Ketik minimal tiga huruf agar pencarian tidak menampilkan banyak siswa sekaligus.'); return; }
   if (WAJIBKAN_NIS && !nis){ tampilkanGalat('NIS belum diisi','Masukkan NIS Anda untuk membuka nilai.'); return; }
@@ -656,15 +699,16 @@ async function cariNilai(){
   $('spandukDemo').classList.add('hidden');
 
   setMemuat(true);
-  const hasil = await ambilData(kelas, nama, nis);
+  const hasil = await ambilData(kelas, mapel, nama, nis);
   setMemuat(false);
   setStatus(hasil.ok);
 
+  const namaMapel = PROFIL_MAPEL[mapel] ? PROFIL_MAPEL[mapel].nama : mapel;
   const pesan = {
     belum_diatur: '',
     galat_http: 'Server nilai tidak dapat dihubungi. Coba lagi beberapa saat.',
     galat_server: 'Server nilai mengalami kendala saat membaca data. Laporkan ke guru atau admin.',
-    kosong: 'Periksa lagi ejaan nama dan pilihan kelas. Kalau sudah sesuai, nilai Anda mungkin belum diinput guru.',
+    kosong: 'Periksa lagi ejaan nama, kelas, dan mata pelajaran. Kalau semuanya sudah sesuai, nilai ' + namaMapel + ' Anda mungkin belum diinput guru.',
     batas_waktu: 'Server terlalu lama merespons. Periksa sinyal internet Anda, lalu coba lagi.',
     jaringan: 'Tidak dapat terhubung ke server nilai. Periksa koneksi Anda, lalu coba lagi.',
     offline: 'Perangkat Anda tidak terhubung ke internet. Aktifkan Wi-Fi atau data seluler, lalu coba lagi.',
@@ -683,10 +727,14 @@ async function cariNilai(){
   }
   if (hasil.alasan === 'belum_diatur') $('spandukDemo').classList.remove('hidden');
 
-  const daftar = (hasil.data || []).filter(function(s){
-    return s && typeof s.nama === 'string' && normalisasi(s.kelas) === normalisasi(kelas);
+  // Saring ulang di sisi klien: kelas DAN mapel harus sama persis, supaya
+  // laporan yang tampil tidak mungkin milik mapel lain.
+  const cocok = (hasil.data || []).filter(function(s){
+    return s && typeof s.nama === 'string'
+      && normalisasi(s.kelas) === normalisasi(kelas)
+      && String(s.mapel || '').toUpperCase() === mapel
+      && normalisasi(s.nama).indexOf(normalisasi(nama)) !== -1;
   });
-  const cocok = daftar.filter(function(s){ return normalisasi(s.nama).indexOf(normalisasi(nama)) !== -1; });
 
   if (!cocok.length){ tampilkanGalat('Siswa tidak ditemukan', pesan.kosong); return; }
   if (cocok.length > 1){
@@ -696,69 +744,50 @@ async function cariNilai(){
   }
 
   metaAktif = hasil.meta || null;
+  kelasTerakhir = kelas;
+  mapelTerakhir = mapel;
   $('waktuPembaruan').textContent = hasil.lastUpdated ? ('Data dibaca ' + hasil.lastUpdated) : '';
-  gambarSiswa(cocok[0]);
+  gambarLaporan(cocok[0]);
   $('blokGalat').classList.add('hidden');
   $('blokHasil').classList.remove('hidden');
-  $('blokHasil').scrollIntoView({ block:'start' });
+  if ($('blokHasil').scrollIntoView) $('blokHasil').scrollIntoView({ block:'start' });
 }
 
 /* ==========================================================================
-   8) RENDER
+   8) RENDER — satu laporan untuk satu mata pelajaran
    ========================================================================== */
-function gambarSiswa(s){
+function gambarLaporan(s){
+  const kode = String(s.mapel || 'DPK').toUpperCase();
+  const profil = PROFIL_MAPEL[kode] || PROFIL_MAPEL.DPK;
+
+  // Kop mapel: warna aksen membedakan laporan GT dan OAW secara visual.
+  const kop = $('kopMapel');
+  kop.style.setProperty('--aksen', profil.aksen);
+  kop.style.setProperty('--aksen-lembut', profil.aksenLembut);
+  $('lencanaMapel').textContent = profil.singkat;
+  $('namaMapel').textContent = (metaAktif && metaAktif.namaMapel) || profil.nama;
+  $('catatanMapel').textContent = profil.catatan;
+
   $('namaSiswa').textContent = s.nama;
   const identitas = [];
   if (s.kelas) identitas.push(s.kelas);
   if (s.nis) identitas.push('NIS ' + s.nis);
   $('identitasSiswa').textContent = identitas.join('  ·  ');
 
-  const mapel = [];
-  if (s.dpk) mapel.push('dpk');
-  if (s.gt)  mapel.push('gt');
-  if (s.oaw) mapel.push('oaw');
+  $('isiLaporan').innerHTML = (kode === 'DPK') ? panelDPK(s.nilai) : panelPraktik(s.nilai, kode);
 
-  const nav = $('navTab');
-  nav.innerHTML = mapel.map(function(k){
-    return '<button class="tab-btn pb-3 -mb-px" role="tab" id="tab-' + k + '" aria-controls="panel-' + k + '" ' +
-           'aria-selected="false" data-tab="' + k + '">' + amanHtml(PROFIL_MAPEL[k].singkat) + '</button>';
-  }).join('');
-  nav.classList.toggle('hidden', mapel.length <= 1);
-  Array.prototype.forEach.call(nav.querySelectorAll('.tab-btn'), function(b){
-    b.addEventListener('click', function(){ pindahTab(b.dataset.tab); });
-  });
-
-  $('panelTab').innerHTML = mapel.map(function(k){
-    return '<div id="panel-' + k + '" class="tab-panel hidden" role="tabpanel" aria-labelledby="tab-' + k + '">' +
-           (k === 'dpk' ? panelDPK(s.dpk) : panelPraktik(s[k], k)) + '</div>';
-  }).join('');
-
-  if (mapel.length) pindahTab(mapel[0]);
-
-  const rekap = $('rekapKejuruan');
-  const nilaiXI = [s.gt && s.gt.nilaiAkhir, s.oaw && s.oaw.nilaiAkhir].filter(function(v){ return typeof v === 'number'; });
-  if (nilaiXI.length === 2){
-    $('angkaRekap').textContent = (nilaiXI.reduce(function(a,b){ return a+b; },0) / 2).toFixed(2);
-    rekap.classList.remove('hidden');
+  // Tawarkan mapel pasangannya tanpa mencampur datanya ke laporan ini.
+  const lain = mapelUntukKelas(s.kelas).filter(function(m){ return m !== kode; });
+  const ajakan = $('ajakanMapelLain');
+  if (lain.length === 1){
+    $('namaMapelLain').textContent = PROFIL_MAPEL[lain[0]].nama;
+    $('tombolMapelLain').textContent = 'Buka laporan ' + PROFIL_MAPEL[lain[0]].singkat;
+    $('tombolMapelLain').dataset.mapel = lain[0];
+    ajakan.classList.remove('hidden');
   } else {
-    rekap.classList.add('hidden');
+    ajakan.classList.add('hidden');
   }
 
-  animasikanKomposisi();
-}
-
-function pindahTab(kunci){
-  tabAktif = kunci;
-  Array.prototype.forEach.call(document.querySelectorAll('.tab-btn'), function(b){
-    const aktif = b.dataset.tab === kunci;
-    b.classList.toggle('active', aktif);
-    b.setAttribute('aria-selected', aktif ? 'true' : 'false');
-  });
-  Array.prototype.forEach.call(document.querySelectorAll('.tab-panel'), function(p){
-    const aktif = p.id === 'panel-' + kunci;
-    p.classList.toggle('hidden', !aktif);
-    if (aktif){ p.classList.remove('muncul'); void p.offsetWidth; p.classList.add('muncul'); }
-  });
   animasikanKomposisi();
 }
 
@@ -915,9 +944,10 @@ function bagianSikap(sikap, absensi, kunciMapel){
 /* ---- Panel DPK (kelas X) ---- */
 function panelDPK(d){
   if (!d) return '<p class="text-sm text-[var(--slate-600)]">Belum ada data.</p>';
-  const bobot = (metaAktif && metaAktif.bobot && metaAktif.bobot.dpk) || {};
-  const bobotKomponen = (metaAktif && metaAktif.bobotKomponen && metaAktif.bobotKomponen.dpk) || {};
-  const sikapTotal = ['kedisiplinan','keaktifan','tanggungJawab'].reduce(function(a,k){ return a + (bobot[k] || 0); }, 0);
+  const bobot = (metaAktif && metaAktif.bobot) || {};
+  const bobotKomponen = (metaAktif && metaAktif.bobotKomponen) || {};
+  const sikapTotal = adaNilai(bobot.sikapTotal) ? bobot.sikapTotal
+    : ['kedisiplinan','keaktifan','tanggungJawab'].reduce(function(a,k){ return a + (bobot[k] || 0); }, 0);
 
   return kartuRingkasan(d.nilaiAkhir, d.predikat, [
       { label:'Pengetahuan', bobot:bobot.pengetahuan },
@@ -930,15 +960,15 @@ function panelDPK(d){
       { label:'Nilai sikap', nilai:angka2(d.nilaiSikap) }
     ]) +
     tabelKomponen('Keterampilan', 'Enam komponen job gambar, total ' + (adaNilai(bobot.keterampilan) ? bobot.keterampilan + '%' : '60%') + ' dari nilai akhir',
-      RUBRIK.dpk.keterampilan, d.keterampilan, bobotKomponen.keterampilan) +
-    bagianSikap(d.sikap, d.absensi, 'dpk');
+      RUBRIK.DPK.keterampilan, d.keterampilan, bobotKomponen.keterampilan) +
+    bagianSikap(d.sikap, d.absensi, 'DPK');
 }
 
 /* ---- Panel GT / OAW (kelas XI) ---- */
 function panelPraktik(d, kunci){
   if (!d) return '<p class="text-sm text-[var(--slate-600)]">Belum ada data.</p>';
-  const bobot = (metaAktif && metaAktif.bobot && metaAktif.bobot[kunci]) || {};
-  const bobotKomponen = (metaAktif && metaAktif.bobotKomponen && metaAktif.bobotKomponen[kunci]) || {};
+  const bobot = (metaAktif && metaAktif.bobot) || {};
+  const bobotKomponen = (metaAktif && metaAktif.bobotKomponen) || {};
   const rubrik = RUBRIK[kunci];
 
   return kartuRingkasan(d.nilaiAkhir, d.predikat, [
@@ -974,15 +1004,58 @@ function pasangLogo(){
   }
 }
 
+/**
+ * Isi dropdown mata pelajaran sesuai tingkat kelas.
+ * Kelas X hanya punya DPK → langsung terpilih dan dikunci, siswa tidak perlu
+ * memutuskan apa pun. Kelas XI harus memilih GT atau OAW secara sadar, karena
+ * keduanya mata pelajaran berbeda dengan nilai rapor masing-masing.
+ */
+function segarkanPilihanMapel(pertahankanPilihan){
+  const kelas = $('pilihKelas').value;
+  const sel = $('pilihMapel');
+  const sebelumnya = pertahankanPilihan ? sel.value : '';
+  const pilihan = mapelUntukKelas(kelas);
+
+  if (!pilihan.length){
+    sel.innerHTML = '<option value="">Pilih kelas lebih dulu</option>';
+    sel.disabled = true;
+    return;
+  }
+  if (pilihan.length === 1){
+    const k = pilihan[0];
+    sel.innerHTML = '<option value="' + k + '">' + amanHtml(PROFIL_MAPEL[k].nama) + '</option>';
+    sel.value = k;
+    sel.disabled = true;   // hanya satu pilihan, tidak ada yang perlu diputuskan
+    return;
+  }
+  sel.innerHTML = '<option value="">Pilih mata pelajaran</option>' +
+    pilihan.map(function(k){
+      return '<option value="' + k + '">' + amanHtml(PROFIL_MAPEL[k].nama) + '</option>';
+    }).join('');
+  sel.disabled = sedangProses;
+  if (sebelumnya && pilihan.indexOf(sebelumnya) !== -1) sel.value = sebelumnya;
+}
+
 function kembaliKePencarian(){
   window.scrollTo({ top:0 });
   setTimeout(function(){ $('isianNama').focus(); $('isianNama').select(); }, 200);
 }
 
+/** Buka laporan mapel pasangannya — pencarian baru, bukan penggabungan data. */
+function bukaMapelLain(){
+  const tujuan = $('tombolMapelLain').dataset.mapel;
+  if (!tujuan) return;
+  $('pilihMapel').value = tujuan;
+  cariNilai();
+}
+
 pasangLogo();
+segarkanPilihanMapel(false);
+$('pilihKelas').addEventListener('change', function(){ segarkanPilihanMapel(false); });
 $('tombolCari').addEventListener('click', cariNilai);
 $('tombolUlang').addEventListener('click', cariNilai);
 $('tombolCariLain').addEventListener('click', kembaliKePencarian);
+$('tombolMapelLain').addEventListener('click', bukaMapelLain);
 ['isianNama','isianNis'].forEach(function(id){
   const el = $(id);
   if (el) el.addEventListener('keydown', function(e){ if (e.key === 'Enter') cariNilai(); });
@@ -993,7 +1066,7 @@ window.addEventListener('offline', function(){ setStatus(false); });
 if (!WAJIBKAN_NIS){
   $('blokNis').classList.add('hidden');
 } else {
-  $('subjudul').textContent = 'Pilih kelas, ketik nama lengkap, dan masukkan NIS untuk melihat rincian nilai Anda.';
+  $('subjudul').textContent = 'Pilih kelas dan mata pelajaran, ketik nama lengkap, lalu masukkan NIS untuk membuka laporan nilai Anda.';
 }
 setStatus(adaGas || (urlSudahDiisi() && navigator.onLine !== false));
 </script>
