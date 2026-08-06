@@ -169,7 +169,7 @@
   <section id="blokPencarian" class="mb-8">
     <div class="mb-5">
       <p class="eyebrow mb-1.5">Semester Ganjil · 16 Pertemuan</p>
-      <h1 class="font-display text-[26px] sm:text-[32px] font-semibold leading-tight mb-1.5">Rekap nilai siswa</h1>
+      <h1 class="font-display text-[26px] sm:text-[32px] font-semibold leading-tight mb-1.5">Portal Nilai</h1>
       <p id="subjudul" class="text-sm text-[var(--slate-600)] max-w-xl">Pilih kelas dan mata pelajaran, lalu ketik nama lengkap Anda. Setiap mata pelajaran punya laporan nilainya sendiri.</p>
     </div>
 
@@ -636,7 +636,17 @@ function tafsirkanPayload(payload){
   if (!payload) return { ok:false, alasan:'format_tidak_dikenali', data:[] };
   if (payload.ok === false) return { ok:false, alasan:'galat_server', data:[] };
   if (payload.terlaluLuas) return { ok:false, alasan:'terlalu_luas', data:[] };
-  if (!payload.data || !payload.data.length) return { ok:false, alasan:'kosong', data:[], sebab:payload.alasan };
+  if (!payload.data || !payload.data.length){
+    // Bedakan "nama tidak cocok" dari "sumber datanya memang bermasalah",
+    // supaya siswa tidak mengira salah ketik padahal sheet-nya yang hilang.
+    if (payload.alasan === 'sheet_tidak_ditemukan'){
+      return { ok:false, alasan:'sheet_tidak_ditemukan', data:[], sheet:payload.sheet || '' };
+    }
+    if (payload.alasan === 'mapel_kosong'){
+      return { ok:false, alasan:'mapel_kosong', data:[] };
+    }
+    return { ok:false, alasan:'kosong', data:[], sebab:payload.alasan };
+  }
   return { ok:true, data:payload.data, meta:payload.meta || null, lastUpdated:payload.lastUpdated || null };
 }
 
@@ -713,15 +723,19 @@ async function cariNilai(){
     jaringan: 'Tidak dapat terhubung ke server nilai. Periksa koneksi Anda, lalu coba lagi.',
     offline: 'Perangkat Anda tidak terhubung ke internet. Aktifkan Wi-Fi atau data seluler, lalu coba lagi.',
     format_tidak_dikenali: 'Data dari server tidak dikenali formatnya. Laporkan ke guru atau admin.',
-    terlalu_luas: 'Nama itu cocok dengan banyak siswa sekaligus. Ketik nama lengkap yang lebih spesifik.'
+    terlalu_luas: 'Nama itu cocok dengan banyak siswa sekaligus. Ketik nama lengkap yang lebih spesifik.',
+    sheet_tidak_ditemukan: 'Lembar nilai ' + namaMapel + ' untuk kelas ini belum tersedia di spreadsheet. Ini bukan kesalahan Anda — mohon laporkan ke guru atau admin.',
+    mapel_kosong: 'Lembar nilai ' + namaMapel + ' untuk kelas ini sudah ada, tetapi belum berisi data siswa. Mohon tunggu guru mengisinya.'
   };
 
   if (!hasil.ok && hasil.alasan !== 'belum_diatur'){
     const judul = hasil.alasan === 'terlalu_luas' ? 'Pencarian terlalu luas'
                 : hasil.alasan === 'kosong' ? 'Siswa tidak ditemukan'
+                : (hasil.alasan === 'sheet_tidak_ditemukan' || hasil.alasan === 'mapel_kosong') ? 'Nilai ' + namaMapel + ' belum tersedia'
                 : 'Gagal mengambil data';
     let detail = pesan[hasil.alasan] || 'Terjadi kendala tak terduga. Coba lagi beberapa saat.';
     if (hasil.alasan === 'galat_http' && hasil.kode) detail += ' (kode ' + hasil.kode + ')';
+    if (hasil.alasan === 'sheet_tidak_ditemukan' && hasil.sheet) detail += ' (sheet yang dicari: "' + hasil.sheet + '")';
     tampilkanGalat(judul, detail, ['galat_http','batas_waktu','jaringan','offline'].indexOf(hasil.alasan) !== -1);
     return;
   }
@@ -878,24 +892,19 @@ function bagianSikap(sikap, absensi, kunciMapel){
   absensi = absensi || {};
   const konteks = PROFIL_MAPEL[kunciMapel].konteks;
   const R = RUBRIK.sikap;
-  const pakaiKelengkapan = sikap.kedisiplinanPakaiKelengkapan !== false;
 
   const daftar = [
-    { def:R.kehadiran, skor:sikap.kehadiran, sumber:'otomatis dari rekap kehadiran' },
-    { def:(konteks === 'bengkel' ? R.kelengkapanApd : R.kelengkapanAlat), skor:sikap.kelengkapan,
-      sumber:(pakaiKelengkapan ? 'otomatis dari lembar absensi' : 'dicatat, tidak dihitung dalam nilai kedisiplinan') },
-    { def:(konteks === 'bengkel' ? R.tataTertibBengkel : R.tataTertibGambar), skor:sikap.tataTertib, sumber:'dinilai guru' },
-    { def:R.keaktifan, skor:sikap.keaktifan, sumber:'dinilai guru' },
-    { def:(konteks === 'bengkel' ? R.tanggungJawabBengkel : R.tanggungJawabGambar), skor:sikap.tanggungJawab, sumber:'dinilai guru' }
+    { def:R.kehadiran, skor:sikap.kehadiran },
+    { def:(konteks === 'bengkel' ? R.kelengkapanApd : R.kelengkapanAlat), skor:sikap.kelengkapan },
+    { def:(konteks === 'bengkel' ? R.tataTertibBengkel : R.tataTertibGambar), skor:sikap.tataTertib },
+    { def:R.keaktifan, skor:sikap.keaktifan },
+    { def:(konteks === 'bengkel' ? R.tanggungJawabBengkel : R.tanggungJawabGambar), skor:sikap.tanggungJawab }
   ];
 
   const baris = daftar.map(function(it){
     const teks = teksRubrik(it.def.teks, it.skor);
     return '<tr>' +
-      '<td class="kolom-sticky min-w-[190px]">' +
-        '<span class="font-medium block">' + amanHtml(it.def.label) + '</span>' +
-        '<span class="eyebrow">' + amanHtml(it.sumber) + '</span>' +
-      '</td>' +
+      '<td class="kolom-sticky font-medium min-w-[190px]">' + amanHtml(it.def.label) + '</td>' +
       '<td>' + pipMeter(it.skor) + '</td>' +
       '<td class="font-data">' + tampil(skorKe100(it.skor)) + '</td>' +
       '<td class="text-[var(--slate-600)] min-w-[300px] leading-relaxed">' + (teks ? amanHtml(teks) : 'Belum ada penilaian.') + '</td>' +
@@ -913,15 +922,10 @@ function bagianSikap(sikap, absensi, kunciMapel){
   if (adaNilai(absensi.persenKelengkapan)) statistik.push({ label:labelKelengkapan, nilai:absensi.persenKelengkapan + '%' });
   if (adaNilai(sikap.nilaiKedisiplinan)) statistik.push({ label:'Nilai kedisiplinan', nilai:angka2(sikap.nilaiKedisiplinan) });
 
-  const catatanKedisiplinan = pakaiKelengkapan
-    ? 'Nilai kedisiplinan dirata-rata dari kehadiran, ' + labelKelengkapan.toLowerCase() + ', dan tata tertib.'
-    : 'Nilai kedisiplinan dirata-rata dari kehadiran dan tata tertib saja.';
-
   return '' +
   '<div class="panel overflow-hidden mb-5">' +
-    '<div class="px-5 py-3.5 border-b border-[var(--steel-200)] flex flex-wrap items-baseline gap-x-3 gap-y-1">' +
+    '<div class="px-5 py-3.5 border-b border-[var(--steel-200)]">' +
       '<h3 class="font-display text-[15px] font-semibold">Sikap &amp; kehadiran</h3>' +
-      '<span class="text-xs text-[var(--slate-600)]">' + amanHtml(catatanKedisiplinan) + '</span>' +
     '</div>' +
     '<div class="gulir-x"><table class="tabel-nilai min-w-[700px]">' +
       '<thead><tr><th class="kolom-sticky">Aspek</th><th>Skor</th><th>Nilai</th><th>Capaian</th></tr></thead>' +
